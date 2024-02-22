@@ -52,13 +52,17 @@ public class BotConnectorController : ControllerBase
             s_tokens.Add(From, token);
         }
         Console.WriteLine("s_tokens: " + s_tokens[From]);
-        var response = await StartConversation(Body, s_tokens[From]);
-        
+        //var response = await StartConversation(Body, s_tokens[From]);
+        var response = await StartConversation(Body, s_tokens[From], From);
+        while (response == "")
+        {
+             response = await StartConversation(Body, s_tokens[From], From);
+        }
         return Ok(response);
     }
 
     //private static async Task<string> StartConversation(string inputMsg)
-    private async Task<string> StartConversation(string inputMsg, string token = "")
+    private async Task<string> StartConversation(string inputMsg, string token = "", string From= "userId")
     {
         Console.WriteLine("token: " + token);
         using (var directLineClient = new DirectLineClient(token))
@@ -76,7 +80,8 @@ public class BotConnectorController : ControllerBase
                 await directLineClient.Conversations.PostActivityAsync(conversationtId, new Activity()
                 {
                     Type = ActivityTypes.Message,
-                    From = new ChannelAccount { Id = "userId", Name = "userName" },
+                    //  From = new ChannelAccount { Id = "userId", Name = "userName" },
+                    From = new ChannelAccount { Id = From, Name = From },
                     Text = inputMsg,
                     TextFormat = "plain",
                     Locale = "en-Us",
@@ -139,22 +144,29 @@ public class BotConnectorController : ControllerBase
                 directLineClient.Dispose();
                 Environment.Exit(0);
             }
+           
 
             _watermark = response?.Watermark;
             result = response?.Activities?.Where(x =>
                 x.Type == ActivityTypes.Message &&
                 string.Equals(x.From.Name, s_botService.BotName, StringComparison.Ordinal)).ToList();
-
+            /*if (response.Activities.Count == 0)
+            {
+                var updatedWaterMark = Convert.ToInt32(_watermark) + 1;
+                _watermark = updatedWaterMark.ToString();
+            }*/
             //Console.WriteLine(result);
             if (result != null && result.Any() && result.Last().Text != null)
             {
                 return result;
             }
 
-            Thread.Sleep(1000);
+            //Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+
         } 
-        //while (response != null && response.Activities.Any());
-        while (response != null) ;
+        while (response != null && response.Activities.Any());
+        //while (response != null) ;
 
         return new List<Activity>();
     }
